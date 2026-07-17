@@ -107,7 +107,8 @@ class SwiGLU(nn.Module):
         self.w3 = Linear(d_model, d_ff, device=device, dtype=dtype)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:        
-        silu_w1_x = self.w1(x) * torch.sigmoid(self.w1(x))
+        w1_x = self.w1(x)
+        silu_w1_x = w1_x * torch.sigmoid(w1_x)
         return self.w2(silu_w1_x * self.w3(x))
     
 class RotaryPositionalEmbedding(nn.Module):

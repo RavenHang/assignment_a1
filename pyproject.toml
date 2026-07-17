@@ -8,6 +8,7 @@ dependencies = [
     "einops>=0.8",      # tensor operations
     "einx>=0.4",        # more general tensor operations
     "jaxtyping>=0.3",   # type hints for pytorch/jax/numpy
+    "matplotlib>=3.10", # experiment learning curves
     "numpy>=2.4",
     "psutil>=7",
     "pytest>=9.0",

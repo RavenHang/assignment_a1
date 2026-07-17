@@ -1,7 +1,6 @@
 import torch
-import torch.nn as nn
 import math
-from typing import Optional, Callable, Iterable
+from collections.abc import Callable, Iterable
 
 def cross_entropy(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
     max_logits, _ = torch.max(logits, dim=-1, keepdim=True)
@@ -33,7 +32,7 @@ class AdamW(torch.optim.Optimizer):
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
         super().__init__(params, defaults)
 
-    def step(self, closure: Optional[Callable] = None):
+    def step(self, closure: Callable | None = None):
         loss = None
         if closure is not None:
             loss = closure()
@@ -100,21 +99,27 @@ def get_lr_cosine_schedule(
         return alpha_min
     
 def clip_gradient_norm(parameters: Iterable[torch.nn.Parameter], max_norm: float, eps: float = 1e-6) -> float:
-    grads = []
-    for p in parameters:
-        if p.grad is not None:
-            grads.append(p.grad.detach().data.view(-1))
-            
-    if len(grads) == 0:
+    parameters = list(parameters)
+    grads = [p.grad.detach() for p in parameters if p.grad is not None]
+
+    if not grads:
         return 0.0
-        
-    flat_grads = torch.cat(grads)
-    total_norm = torch.linalg.vector_norm(flat_grads, ord=2).item()
-    
+
+    # Accumulating squared norms avoids allocating one model-sized flattened tensor.
+    norm_device = grads[0].device
+    squared_norm = torch.zeros((), device=norm_device, dtype=torch.float32)
+    for grad in grads:
+        squared_norm += torch.sum(grad.detach().float() ** 2)
+    total_norm_tensor = torch.sqrt(squared_norm)
+    total_norm = total_norm_tensor.item()
+
+    if not math.isfinite(total_norm):
+        return total_norm
+
     if total_norm > max_norm:
         clip_coef = max_norm / (total_norm + eps)
         for p in parameters:
             if p.grad is not None:
-                p.grad.detach().data.mul_(clip_coef)
-                
+                p.grad.detach().mul_(clip_coef)
+
     return total_norm
